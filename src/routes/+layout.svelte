@@ -7,6 +7,7 @@
 	import { Toaster } from '$lib/components/ui/sonner';
 	import { toast } from 'svelte-sonner';
 	import Navigation from '$lib/components/navigation/navigation.svelte';
+	import Footer from '$lib/components/navigation/footer.svelte';
 
 	export let data: any;
 	let user: PageData['user'];
@@ -31,7 +32,8 @@
 <Toaster richColors />
 <div class="relative flex min-h-screen flex-col">
 	<Navigation {user} />
-	<div class="mt-8 md:mt-12">
+	<div class="mt-8 md:mt-12 mb-12">
 		<slot />
 	</div>
+	<Footer />
 </div>

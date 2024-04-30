@@ -1,4 +1,4 @@
-import { pgTable, text, timestamp, boolean } from 'drizzle-orm/pg-core';
+import { pgTable, text, timestamp, boolean, jsonb } from 'drizzle-orm/pg-core';
 
 export const userTable = pgTable('users', {
 	id: text('id').notNull().primaryKey(),
@@ -31,6 +31,16 @@ export const sessionTable = pgTable('sessions', {
 		withTimezone: true,
 		mode: 'date'
 	}).notNull()
+});
+
+export const officialsTable = pgTable('officials', {
+	official_id: text('official_id').notNull().primaryKey(),
+	name: text('name').notNull(),
+	title: text('title').notNull(),
+	image_url: text('image_url'), // Assuming 'url' type handles URL validation; replace with 'text' if not available
+	social_links: jsonb('social_links'), // Stores social media URLs as JSON
+	region: text('region').notNull(),
+	level: text('level').notNull() // "local" or "federal"
 });
 
 export type User = typeof userTable.$inferInsert;

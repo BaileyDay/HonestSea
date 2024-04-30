@@ -1,6 +1,6 @@
 <script lang="ts">
-	import { User2 } from 'lucide-svelte';
+	import logo from '$lib/images/logo.svg';
 	export let size: string;
 </script>
 
-<User2 {size} />
+<img src={logo} alt="Logo" width={size} height={size} />
