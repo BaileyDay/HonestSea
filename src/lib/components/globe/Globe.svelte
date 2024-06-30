@@ -1,99 +1,58 @@
-<script>
-	import { onMount } from 'svelte';
-	import * as d3 from 'd3';
-	import data from './world.json';
+<script lang="ts">
+	import { onMount, onDestroy } from 'svelte';
+	import { browser } from '$app/environment';
 
-	let svg, projection, initialScale, path, globe;
+	let d3: any;
+	let data: any;
+
+	let svg: any;
+	let projection: any;
+	let path: any;
+	let globe: any;
 	const sensitivity = 80;
+	let rotationTimer: any;
 
-	// Function to calculate scale based on the container width
-	function calculateScale(width) {
-		if (width < 640) {
-			// Smaller devices
-			return width / 3; // Smaller scale for small devices
-		} else if (width < 1024) {
-			// Medium devices
-			return width / 3.5;
-		} else {
-			// Larger devices
-			return 350; // Maximum scale for large devices
-		}
+	export let width = '100%';
+	export let height = '100%';
+
+	function calculateScale(width: number): number {
+		return Math.max(width / 2, 400); // Adjusted scale for hero background
 	}
 
-	function calculateHeight(width) {
-		if (width < 768) {
-			// Mobile breakpoint
-			return width / 1.5;
-		} else {
-			// Desktop
-			return width / 2.5;
-		}
-	}
+	function setupProjectionAndSVG(): void {
+		if (!browser) return;
 
-	function setupProjectionAndSVG() {
-		const mapContainer = document.querySelector('#map');
-		const width = mapContainer.getBoundingClientRect().width;
-		const height = calculateHeight(width); // Maintain a 2:1 width to height ratio
+		const mapContainer = document.querySelector('#hero-background-globe') as HTMLElement;
+		const containerWidth = mapContainer.getBoundingClientRect().width;
+		const containerHeight = mapContainer.getBoundingClientRect().height;
 
-		// Update the projection
 		projection
-			.scale(calculateScale(width)) // Dynamically calculate scale
-			.translate([width / 2, height / 2]); // Center the projection
+			.scale(calculateScale(Math.min(containerWidth, containerHeight)))
+			.translate([containerWidth / 2, containerHeight / 2])
+			.rotate([-98, -39, 0]); // Centered on USA
 
-		// Update the SVG dimensions
-		svg.attr('width', width).attr('height', height);
+		svg.attr('width', containerWidth).attr('height', containerHeight);
 
-		// Update the globe circle
 		globe
-			.attr('cx', width / 2)
-			.attr('cy', height / 2)
+			.attr('cx', containerWidth / 2)
+			.attr('cy', containerHeight / 2)
 			.attr('r', projection.scale());
 
-		// Redraw the countries
-		svg.selectAll('.country').attr('d', path);
-
-		// Redraw the globe circle
-		svg.select('circle').attr('r', projection.scale());
+		svg.selectAll('path').attr('d', path);
 	}
 
-	onMount(() => {
-		svg = d3.select('#map').append('svg');
-		projection = d3.geoOrthographic().center([0, 0]).rotate([0, -30]);
-		path = d3.geoPath().projection(projection);
-		globe = svg
-			.append('circle')
-			.attr('fill', '#EEE')
-			.attr('stroke', '#000')
-			.attr('stroke-width', '0.2');
+	function drawGlobe(): void {
+		// Ocean
+		svg
+			.append('path')
+			.datum({ type: 'Sphere' })
+			.attr('class', 'ocean')
+			.attr('d', path)
+			.attr('fill', 'rgba(238, 238, 238, 0.1)') // Very light, transparent
+			.attr('stroke', 'rgba(0, 0, 0, 0.5)')
+			.attr('stroke-width', 0.3);
 
-		setupProjectionAndSVG();
-		drawCountries();
-		setupInteraction();
-
-		// Setup resize event listener to adjust the view on viewport size changes
-		window.addEventListener('resize', setupProjectionAndSVG);
-
-		d3.timer(function (elapsed) {
-			const rotate = projection.rotate();
-			const k = sensitivity / projection.scale();
-			projection.rotate([rotate[0] - 1 * k, rotate[1]]);
-			path = d3.geoPath().projection(projection);
-			svg.selectAll('path').attr('d', path);
-		}, 200);
-	});
-
-	function setupInteraction() {
-		svg.call(
-			d3.drag().on('drag', (event) => {
-				const rotate = projection.rotate();
-				const k = sensitivity / projection.scale();
-				projection.rotate([rotate[0] + event.dx * k, rotate[1] - event.dy * k]);
-				svg.selectAll('.country').attr('d', path);
-			})
-		);
-	}
-
-	function drawCountries() {
+		// Countries
 		svg
 			.append('g')
 			.attr('class', 'countries')
@@ -103,11 +62,53 @@
 			.append('path')
 			.attr('class', 'country')
 			.attr('d', path)
-			.attr('fill', (d) => (d.properties.name === 'USA' ? '#7dd3fc' : 'white'))
-			.style('stroke', (d) => (d.properties.name === 'USA' ? '#0ea5e9' : 'black'))
-			.style('stroke-width', (d) => (d.properties.name === 'USA' ? '1' : '0.3'))
+			.attr('fill', (d: any) =>
+				d.properties.name === 'USA' ? 'rgba(125, 211, 252, 0.5)' : 'rgba(255, 255, 255, 0.5)'
+			)
+			.style('stroke', (d: any) =>
+				d.properties.name === 'USA' ? 'rgba(14, 165, 233, 0.5)' : 'rgba(0, 0, 0, 0.3)'
+			)
+			.style('stroke-width', (d: any) => (d.properties.name === 'USA' ? 0.5 : 0.2))
 			.style('opacity', 0.8);
 	}
+
+	onMount(async () => {
+		if (browser) {
+			d3 = await import('d3');
+			data = await import('./world.json');
+
+			svg = d3.select('#hero-background-globe').append('svg');
+			projection = d3.geoOrthographic().center([0, 0]);
+			path = d3.geoPath().projection(projection);
+			globe = svg
+				.append('circle')
+				.attr('fill', 'none')
+				.attr('stroke', 'rgba(0, 0, 0, 0.05)')
+				.attr('stroke-width', '0.2');
+
+			setupProjectionAndSVG();
+			drawGlobe();
+
+			window.addEventListener('resize', setupProjectionAndSVG);
+
+			rotationTimer = d3.timer((elapsed: number) => {
+				const rotate = projection.rotate();
+				const k = sensitivity / projection.scale();
+				projection.rotate([rotate[0] - 0.3 * k, rotate[1]]); // Slower rotation
+				svg.selectAll('path').attr('d', path);
+			}, 200);
+		}
+	});
+
+	onDestroy(() => {
+		if (browser && window) {
+			window.removeEventListener('resize', setupProjectionAndSVG);
+			if (rotationTimer) rotationTimer.stop();
+		}
+	});
 </script>
 
-<div id="map" class="w-full"></div>
+<div
+	id="hero-background-globe"
+	style="width: {width}; height: {height}; position: absolute; top: 0; left: 0; z-index: -1;"
+></div>
