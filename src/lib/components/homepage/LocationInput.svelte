@@ -1,80 +1,35 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
-	import { MapPin, Loader2 } from 'lucide-svelte';
+	import { MapPin, Loader2, Search } from 'lucide-svelte';
 	import { Input } from '$lib/components/ui/input';
 	import { Button } from '$lib/components/ui/button';
 	import { fly, fade } from 'svelte/transition';
+	import { debounce } from 'lodash-es';
 
 	let address = '';
+	let suggestions: Array<{ place_name: string; id: string; type: string }> = [];
 	let errorMessage = '';
 	let isLoading = false;
 
-	const getLocation = async () => {
-		if (navigator.geolocation) {
-			isLoading = true;
-			errorMessage = '';
-			navigator.geolocation.getCurrentPosition(showPosition, showError);
-		} else {
-			errorMessage = 'Geolocation is not supported by this browser.';
+	const fetchSuggestions = debounce(async (input: string) => {
+		if (input.length < 3) {
+			suggestions = [];
+			return;
 		}
-	};
 
-	function showPosition(position) {
-		const latitude = position.coords.latitude;
-		const longitude = position.coords.longitude;
-		redirectToLocation(latitude, longitude);
-	}
-
-	const redirectToLocation = async (latitude: number, longitude: number) => {
 		try {
-			const response = await fetch('/api/location', {
-				method: 'POST',
-				headers: {
-					'Content-Type': 'application/json'
-				},
-				body: JSON.stringify({
-					latitude: latitude,
-					longitude: longitude
-				})
-			});
-
-			if (!response.ok) {
-				throw new Error('Network response was not ok');
-			}
-
+			const response = await fetch(`/api/geocode?input=${encodeURIComponent(input)}`);
+			if (!response.ok) throw new Error('Failed to fetch suggestions');
 			const data = await response.json();
-			if (data.redirectUrl) {
-				goto(data.redirectUrl);
-			} else {
-				errorMessage = 'Unable to find location information. Please try again.';
-			}
+			suggestions = data.suggestions;
 		} catch (error) {
-			console.error('Failed to send location:', error);
-			errorMessage = 'An error occurred. Please try again.';
-		} finally {
-			isLoading = false;
+			console.error('Error fetching suggestions:', error);
+			suggestions = [];
 		}
-	};
+	}, 300);
 
-	function showError(error: GeolocationPositionError) {
-		isLoading = false;
-		switch (error.code) {
-			case error.PERMISSION_DENIED:
-				errorMessage = 'Please enable location services or enter your address manually.';
-				break;
-			case error.POSITION_UNAVAILABLE:
-				errorMessage =
-					'Location information is unavailable. Please try again or enter your address manually.';
-				break;
-			case error.TIMEOUT:
-				errorMessage =
-					'The request to get your location timed out. Please try again or enter your address manually.';
-				break;
-			default:
-				errorMessage =
-					'An unknown error occurred. Please try again or enter your address manually.';
-				break;
-		}
+	$: {
+		fetchSuggestions(address);
 	}
 
 	const handleAddressSubmit = async () => {
@@ -86,15 +41,24 @@
 		isLoading = true;
 		errorMessage = '';
 		try {
-			// Here you would typically call a geocoding service to convert the address to coordinates
-			// For this example, we'll simulate it with a timeout
-			await new Promise((resolve) => setTimeout(resolve, 1000));
+			const response = await fetch('/api/geocode', {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json'
+				},
+				body: JSON.stringify({ address })
+			});
 
-			// Replace these with actual geocoding results
-			const latitude = 40.7128;
-			const longitude = -74.006;
+			if (!response.ok) throw new Error('Failed to process address');
 
-			await redirectToLocation(latitude, longitude);
+			const data = await response.json();
+			if (data.state) {
+				goto(`/${data.state.toLowerCase().replace(/\s+/g, '-')}`);
+			} else if (data.type === 'region') {
+				goto(`/${data.address.toLowerCase().replace(/\s+/g, '-')}`);
+			} else {
+				errorMessage = 'Unable to determine state from the given address.';
+			}
 		} catch (error) {
 			console.error('Error processing address:', error);
 			errorMessage = 'Unable to process your address. Please try again.';
@@ -102,54 +66,77 @@
 			isLoading = false;
 		}
 	};
+
+	const selectSuggestion = (suggestion: { place_name: string; id: string; type: string }) => {
+		address = suggestion.place_name;
+		suggestions = [];
+		if (suggestion.type === 'region') {
+			goto(`/${suggestion.place_name.toLowerCase().replace(/\s+/g, '-')}`);
+		} else {
+			handleAddressSubmit();
+		}
+	};
 </script>
 
 <section
-	class="w-full py-12 bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-800 dark:to-gray-900"
+	class="w-full py-16 bg-gradient-to-br from-sky-50 to-blue-100 dark:from-gray-800 dark:to-gray-900"
 >
-	<div class="container px-4 md:px-6 mx-auto max-w-xl">
+	<div class="w-full max-w-2xl mx-auto px-4 sm:px-6 lg:px-8">
 		<div
 			in:fly={{ y: 50, duration: 1000 }}
-			class="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 md:p-8"
+			class="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-8 md:p-10"
 		>
-			<h2 class="text-2xl font-bold text-gray-800 dark:text-white mb-6 text-center">
+			<h2 class="text-3xl font-bold text-gray-900 dark:text-white mb-8 text-center">
 				Find Your Representatives
 			</h2>
-			<form on:submit|preventDefault={handleAddressSubmit} class="space-y-4">
+			<form on:submit|preventDefault={handleAddressSubmit} class="space-y-6">
 				<div class="relative">
 					<div
-						on:click={getLocation}
-						class="absolute left-4 top-1/2 -translate-y-1/2 cursor-pointer transition-colors duration-200 ease-in-out"
+						class="absolute left-4 top-1/2 -translate-y-1/2 transition-colors duration-200 ease-in-out"
 					>
-						<MapPin class="h-5 w-5 text-blue-500 hover:text-blue-600" />
+						<MapPin class="h-5 w-5 text-sky-500" />
 					</div>
 					<Input
 						bind:value={address}
-						class="w-full pl-12 pr-4 py-3 text-gray-900 dark:text-white bg-gray-100 dark:bg-gray-700 border-2 border-transparent focus:border-blue-500 focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-800 rounded-lg transition-all duration-200 ease-in-out"
-						placeholder="Enter your address"
+						on:input={() => fetchSuggestions(address)}
+						class="w-full pl-12 pr-4 py-4 text-lg text-gray-900 dark:text-white bg-gray-100 dark:bg-gray-700 border-2 border-transparent focus:border-sky-500 focus:ring-2 focus:ring-sky-200 dark:focus:ring-sky-800 rounded-lg transition-all duration-200 ease-in-out"
+						placeholder="Enter your address or state"
 						type="text"
 						disabled={isLoading}
 					/>
+					{#if suggestions.length > 0}
+						<ul class="absolute z-10 w-full bg-white dark:bg-gray-700 mt-1 rounded-lg shadow-lg">
+							{#each suggestions as suggestion}
+								<li
+									class="px-4 py-2 hover:bg-sky-100 dark:hover:bg-sky-800 cursor-pointer"
+									on:click={() => selectSuggestion(suggestion)}
+								>
+									{suggestion.place_name}
+								</li>
+							{/each}
+						</ul>
+					{/if}
 				</div>
 				<Button
 					type="submit"
-					class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-lg transition-colors duration-200 ease-in-out focus:ring-4 focus:ring-blue-300 dark:focus:ring-blue-900"
+					class="w-full bg-sky-500 hover:bg-sky-600 text-white font-semibold py-4 rounded-lg text-lg transition-colors duration-200 ease-in-out focus:ring-4 focus:ring-sky-300 dark:focus:ring-sky-900 flex items-center justify-center"
 					disabled={isLoading}
 				>
 					{#if isLoading}
-						<Loader2 class="animate-spin mr-2 h-5 w-5 inline" />
-						Loading...
+						<Loader2 class="animate-spin mr-2 h-5 w-5" />
+						Searching...
 					{:else}
+						<Search class="mr-2 h-5 w-5" />
 						Find My Representatives
 					{/if}
 				</Button>
+				<p class="text-sm text-gray-600 dark:text-gray-400 mt-6 text-center">
+					Click the map pin icon to use your current location, or enter your address manually.
+				</p>
 			</form>
 			{#if errorMessage}
-				<p in:fade class="text-red-500 mt-4 text-center">{errorMessage}</p>
+				<p in:fade class="text-red-500 mt-6 text-center">{errorMessage}</p>
 			{/if}
-			<p class="text-sm text-gray-600 dark:text-gray-400 mt-4 text-center">
-				Click the map pin icon to use your current location, or enter your address manually.
-			</p>
 		</div>
 	</div>
 </section>
