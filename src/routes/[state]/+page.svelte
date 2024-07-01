@@ -1,6 +1,10 @@
 <script lang="ts">
+	import InteractiveStateMap from '$lib/components/state/InteractiveStateMap.svelte';
+
 	export let data;
 	const { stateData } = data;
+	const geoData = stateData?.stateJson[0].data;
+	console.log(geoData);
 </script>
 
 <main
@@ -12,4 +16,10 @@
 		</h1>
 		<p class="text-lg text-gray-600 dark:text-gray-300">Quick facts about the state</p>
 	</section>
+
+	<div class="container mx-auto px-4">
+		<div class="grid md:grid-cols-2 gap-8 mb-8">
+			<InteractiveStateMap stateName={stateData.name} {geoData} />
+		</div>
+	</div>
 </main>
