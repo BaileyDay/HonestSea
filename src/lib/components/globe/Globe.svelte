@@ -29,7 +29,7 @@
 		projection
 			.scale(calculateScale(Math.min(containerWidth, containerHeight)))
 			.translate([containerWidth / 2, containerHeight / 2])
-			.rotate([-98, -39, 0]); // Centered on USA
+			.rotate([98, -40, 0]); // Corrected initial rotation centered on USA
 
 		svg.attr('width', containerWidth).attr('height', containerHeight);
 
@@ -48,7 +48,7 @@
 			.datum({ type: 'Sphere' })
 			.attr('class', 'ocean')
 			.attr('d', path)
-			.attr('fill', 'rgba(238, 238, 238, 0.1)') // Very light, transparent
+			.attr('fill', 'rgba(238, 238, 238, 0.1)')
 			.attr('stroke', 'rgba(0, 0, 0, 0.5)')
 			.attr('stroke-width', 0.3);
 
@@ -63,7 +63,7 @@
 			.attr('class', 'country')
 			.attr('d', path)
 			.attr('fill', (d: any) =>
-				d.properties.name === 'USA' ? 'rgba(125, 211, 252, 0.5)' : 'rgba(255, 255, 255, 0.5)'
+				d.properties.name === 'USA' ? 'rgba(125, 211, 252, 0.5)' : 'rgba(255, 255, 255, 0.2)'
 			)
 			.style('stroke', (d: any) =>
 				d.properties.name === 'USA' ? 'rgba(14, 165, 233, 0.5)' : 'rgba(0, 0, 0, 0.3)'
@@ -94,7 +94,7 @@
 			rotationTimer = d3.timer((elapsed: number) => {
 				const rotate = projection.rotate();
 				const k = sensitivity / projection.scale();
-				projection.rotate([rotate[0] - 0.3 * k, rotate[1]]); // Slower rotation
+				projection.rotate([rotate[0] - 0.2 * k, rotate[1], rotate[2]]);
 				svg.selectAll('path').attr('d', path);
 			}, 200);
 		}

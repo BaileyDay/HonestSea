@@ -11,14 +11,20 @@
 	let errorMessage = '';
 	let isLoading = false;
 
+	function sanitizeInput(input: string): string {
+		return input.replace(/[^a-zA-Z0-9\s.,'-]/g, '').trim();
+	}
+
 	const fetchSuggestions = debounce(async (input: string) => {
 		if (input.length < 3) {
 			suggestions = [];
 			return;
 		}
 
+		const sanitizedInput = sanitizeInput(input);
+
 		try {
-			const response = await fetch(`/api/geocode?input=${encodeURIComponent(input)}`);
+			const response = await fetch(`/api/geocode?input=${encodeURIComponent(sanitizedInput)}`);
 			if (!response.ok) throw new Error('Failed to fetch suggestions');
 			const data = await response.json();
 			suggestions = data.suggestions;
@@ -33,8 +39,9 @@
 	}
 
 	const handleAddressSubmit = async () => {
-		if (!address.trim()) {
-			errorMessage = 'Please enter an address.';
+		const sanitizedAddress = sanitizeInput(address);
+		if (!sanitizedAddress) {
+			errorMessage = 'Please enter a valid address.';
 			return;
 		}
 
@@ -46,7 +53,7 @@
 				headers: {
 					'Content-Type': 'application/json'
 				},
-				body: JSON.stringify({ address })
+				body: JSON.stringify({ address: sanitizedAddress })
 			});
 
 			if (!response.ok) throw new Error('Failed to process address');

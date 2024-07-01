@@ -4,6 +4,12 @@ import { env } from '$env/dynamic/private';
 
 const MAPBOX_ACCESS_TOKEN = env.MAPBOX_TOKEN;
 
+// Helper function to sanitize input
+function sanitizeInput(input: string): string {
+	// Remove any characters that aren't alphanumeric, spaces, or common punctuation
+	return input.replace(/[^a-zA-Z0-9\s.,'-]/g, '').trim();
+}
+
 async function fetchFromMapbox(endpoint: string, params: Record<string, string>) {
 	const url = new URL(`https://api.mapbox.com/geocoding/v5/${endpoint}`);
 	url.search = new URLSearchParams({
@@ -24,17 +30,26 @@ export const GET: RequestHandler = async ({ url }) => {
 		return json({ suggestions: [] });
 	}
 
-	try {
-		const data = await fetchFromMapbox('mapbox.places/' + encodeURIComponent(input) + '.json', {
-			country: 'US',
-			types: 'address,place,region',
-			autocomplete: 'true',
-			limit: '5',
-			language: 'en',
-			fuzzyMatch: 'true'
-		});
+	const sanitizedInput = sanitizeInput(input);
 
-		const suggestions = data.features.map((feature) => ({
+	if (sanitizedInput.length < 3) {
+		return json({ suggestions: [] });
+	}
+
+	try {
+		const data = await fetchFromMapbox(
+			'mapbox.places/' + encodeURIComponent(sanitizedInput) + '.json',
+			{
+				country: 'US',
+				types: 'address,place,region',
+				autocomplete: 'true',
+				limit: '5',
+				language: 'en',
+				fuzzyMatch: 'true'
+			}
+		);
+
+		const suggestions = data.features.map((feature: any) => ({
 			place_name: feature.place_name,
 			id: feature.id,
 			type: feature.place_type[0]
@@ -47,7 +62,12 @@ export const GET: RequestHandler = async ({ url }) => {
 };
 
 export const POST: RequestHandler = async ({ request }) => {
-	const { address } = await request.json();
+	const body = await request.json();
+	const address = typeof body.address === 'string' ? sanitizeInput(body.address) : '';
+
+	if (!address) {
+		return json({ error: 'Invalid address provided' }, { status: 400 });
+	}
 
 	try {
 		const data = await fetchFromMapbox('mapbox.places/' + encodeURIComponent(address) + '.json', {
@@ -64,7 +84,7 @@ export const POST: RequestHandler = async ({ request }) => {
 
 		const result = data.features[0];
 		const { place_name, center, context, place_type } = result;
-		const state = context.find((item) => item.id.startsWith('region'))?.text;
+		const state = context.find((item: any) => item.id.startsWith('region'))?.text;
 
 		return json({
 			address: place_name,
@@ -72,7 +92,7 @@ export const POST: RequestHandler = async ({ request }) => {
 			lat: center[1],
 			lng: center[0],
 			type: place_type[0],
-			bbox: result.bbox // Bounding box, if available
+			bbox: result.bbox
 		});
 	} catch (error) {
 		console.error('Geocoding error:', error);

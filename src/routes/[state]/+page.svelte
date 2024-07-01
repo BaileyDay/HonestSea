@@ -1,17 +1,15 @@
 <script lang="ts">
-	import { page } from '$app/stores';
-
-	$: stateName = $page.params.state
-		.split('-')
-		.map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-		.join(' ');
+	export let data;
+	const { stateData } = data;
 </script>
 
-<svelte:head>
-	<title>{stateName} | HonestSea</title>
-</svelte:head>
-
-<div class="container mx-auto px-4 py-8">
-	<h1 class="text-4xl font-bold mb-6">{stateName}</h1>
-	<p>Information about elected officials in {stateName} will be displayed here.</p>
-</div>
+<main
+	class="min-h-screen bg-gradient-to-br from-sky-50 to-blue-100 dark:from-gray-900 dark:to-blue-900"
+>
+	<section class="bg-white dark:bg-gray-800 shadow-lg p-8 mb-8">
+		<h1 class="text-4xl font-bold text-gray-900 dark:text-white mb-4">
+			{stateData.name.charAt(0).toUpperCase() + stateData.name.slice(1)}
+		</h1>
+		<p class="text-lg text-gray-600 dark:text-gray-300">Quick facts about the state</p>
+	</section>
+</main>
