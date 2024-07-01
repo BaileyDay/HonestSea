@@ -38,8 +38,22 @@
 		fetchSuggestions(address);
 	}
 
-	const handleAddressSubmit = async () => {
-		const sanitizedAddress = sanitizeInput(address);
+	const selectSuggestion = (suggestion: { place_name: string; id: string; type: string }) => {
+		address = suggestion.place_name;
+		suggestions = [];
+		if (suggestion.type === 'region') {
+			goto(
+				`/${suggestion.place_name.toLowerCase().replace(/\s+/g, '-')}?lat=${
+					suggestion.center[1]
+				}&lon=${suggestion.center[0]}`
+			);
+		} else {
+			handleAddressSubmit();
+		}
+	};
+
+	const handleAddressSubmit = async (selectedAddress?: string) => {
+		const sanitizedAddress = sanitizeInput(selectedAddress || address);
 		if (!sanitizedAddress) {
 			errorMessage = 'Please enter a valid address.';
 			return;
@@ -60,9 +74,7 @@
 
 			const data = await response.json();
 			if (data.state) {
-				goto(`/${data.state.toLowerCase().replace(/\s+/g, '-')}`);
-			} else if (data.type === 'region') {
-				goto(`/${data.address.toLowerCase().replace(/\s+/g, '-')}`);
+				goto(`/${data.state.toLowerCase().replace(/\s+/g, '-')}?lat=${data.lat}&lon=${data.lng}`);
 			} else {
 				errorMessage = 'Unable to determine state from the given address.';
 			}
@@ -71,16 +83,6 @@
 			errorMessage = 'Unable to process your address. Please try again.';
 		} finally {
 			isLoading = false;
-		}
-	};
-
-	const selectSuggestion = (suggestion: { place_name: string; id: string; type: string }) => {
-		address = suggestion.place_name;
-		suggestions = [];
-		if (suggestion.type === 'region') {
-			goto(`/${suggestion.place_name.toLowerCase().replace(/\s+/g, '-')}`);
-		} else {
-			handleAddressSubmit();
 		}
 	};
 </script>

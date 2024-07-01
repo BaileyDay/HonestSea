@@ -59,14 +59,24 @@ const abr = {
 export const load: PageServerLoad = async ({ params, fetch }) => {
 	const stateName = params.state.toString();
 	const stateAbr = abr[stateName];
-	const stateJson = await db
-		.select()
-		.from(geodata)
-		.where(sql`state = ${stateAbr} and ${geodata.level} = 'state'`);
-	console.log(stateJson);
+
 	try {
+		const stateData = await db
+			.select()
+			.from(geodata)
+			.where(sql`state = ${stateAbr} and ${geodata.level} = 'state'`);
+
+		const districtData = await db
+			.select()
+			.from(geodata)
+			.where(sql`state = ${stateAbr} and ${geodata.level} = 'district'`);
+
 		return {
-			stateData: { name: stateName, stateJson: stateJson }
+			stateData: {
+				name: stateName,
+				stateJson: stateData[0],
+				districts: districtData
+			}
 		};
 	} catch (error) {
 		console.error('Error fetching state data:', error);
@@ -76,14 +86,3 @@ export const load: PageServerLoad = async ({ params, fetch }) => {
 		};
 	}
 };
-
-function processStateData(data: any) {
-	// Transform the API response into the format your frontend expects
-	// This is a placeholder function - implement the actual logic based on the API response structure
-	return {
-		name: data.normalizedInput.state,
-		officials: data.officials,
-		offices: data.offices
-		// Add more processed data as needed
-	};
-}
