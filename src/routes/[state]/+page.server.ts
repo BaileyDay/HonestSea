@@ -2,6 +2,7 @@ import type { PageServerLoad } from './$types';
 import db from '$lib/server/database/drizzle';
 import { geodata } from '$lib/server/database/drizzle-schemas';
 import { eq, sql } from 'drizzle-orm';
+import { error } from '@sveltejs/kit';
 
 const abr = {
 	alabama: 'AL',
@@ -61,6 +62,7 @@ export const load: PageServerLoad = async ({ params, fetch }) => {
 	const stateAbr = abr[stateName];
 
 	try {
+		// Fetch existing state data
 		const stateData = await db
 			.select()
 			.from(geodata)
@@ -71,18 +73,29 @@ export const load: PageServerLoad = async ({ params, fetch }) => {
 			.from(geodata)
 			.where(sql`state = ${stateAbr} and ${geodata.level} = 'district'`);
 
+		// Fetch officials data from our new API endpoint
+		const officialsResponse = await fetch(`/api/officials/${stateName}`);
+		if (!officialsResponse.ok) {
+			throw new Error('Failed to fetch officials data');
+		}
+		const officials = await officialsResponse.json();
+
+		// Find the governor from the officials
+		const governor = officials.find((official: any) =>
+			official.title.toLowerCase().includes('governor')
+		);
+
 		return {
 			stateData: {
 				name: stateName,
 				stateJson: stateData[0],
-				districts: districtData
+				districts: districtData,
+				officials: officials,
+				governor: governor || null
 			}
 		};
-	} catch (error) {
-		console.error('Error fetching state data:', error);
-		return {
-			status: 500,
-			error: 'Failed to load state data'
-		};
+	} catch (err) {
+		console.error('Error loading state data:', err);
+		throw error(500, 'Failed to load state data');
 	}
 };

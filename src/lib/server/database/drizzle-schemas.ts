@@ -34,59 +34,23 @@ export const sessionTable = pgTable('sessions', {
 });
 
 export const officialsTable = pgTable('officials', {
-	// Core Information
-	official_id: text('official_id').notNull().primaryKey(),
+	official_id: text('official_id').primaryKey(),
 	name: text('name').notNull(),
 	party: text('party'),
 	title: text('title').notNull(),
-
-	// Geographical Information
 	state: text('state').notNull(),
-	district: text('district'),
-	county: text('county'),
-	city: text('city'),
-
-	// Contact Information
-	office_address: text('office_address'),
-	phone: text('phone'),
-	email: text('email'),
-	website: text('website'),
-
-	// Media
+	level: text('level').notNull(),
+	role: text('role').notNull(),
+	division_id: text('division_id').notNull(),
 	image_url: text('image_url'),
-	social_links: jsonb('social_links'),
-
-	// Classification
-	level: text('level').notNull(), // 'federal', 'state', 'local'
-	branch: text('branch'), // 'executive', 'legislative', 'judicial'
-	chamber: text('chamber'), // For legislators: 'senate', 'house', etc.
-
-	// Term Information
-	term_start: timestamp('term_start'),
-	term_end: timestamp('term_end'),
-	term_limit: integer('term_limit'),
-
-	// Additional Details
-	biography: text('biography'),
-	education: jsonb('education'),
-	professional_experience: jsonb('professional_experience'),
-	committee_assignments: jsonb('committee_assignments'),
-
-	// Voting and Bill Information
-	voting_record_summary: jsonb('voting_record_summary'),
-	sponsored_bills: jsonb('sponsored_bills'),
-
-	// Financial Information
-	campaign_finance_summary: jsonb('campaign_finance_summary'),
-	top_donors: jsonb('top_donors'),
-
-	// Metadata
+	websites: jsonb('websites'),
+	emails: jsonb('emails'),
+	phones: jsonb('phones'),
+	address: jsonb('address'),
+	social_media: jsonb('social_media'),
 	last_updated: timestamp('last_updated').notNull(),
 	data_source: text('data_source').notNull(),
-	is_active: boolean('is_active').notNull().default(true),
-
-	// Additional fields for flexibility
-	additional_info: jsonb('additional_info')
+	is_active: boolean('is_active').notNull()
 });
 
 export const geodata = pgTable('geodata', {

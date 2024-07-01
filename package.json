@@ -52,6 +52,7 @@
 		"@lucia-auth/adapter-drizzle": "^1.0.2",
 		"@mapbox/mapbox-gl-geocoder": "^5.0.2",
 		"arctic": "^1.2.0",
+		"axios": "^1.7.2",
 		"bits-ui": "^0.11.8",
 		"clsx": "^2.0.0",
 		"cmdk-sv": "^0.0.12",

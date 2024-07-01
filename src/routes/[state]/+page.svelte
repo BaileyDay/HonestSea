@@ -3,6 +3,7 @@
 	import { fade, fly } from 'svelte/transition';
 	import { onMount } from 'svelte';
 	import { page } from '$app/stores';
+	import OfficialCard from '$lib/components/OfficialCard.svelte';
 
 	export let data;
 	const { stateData } = data;
@@ -72,4 +73,15 @@
 	<div
 		class="absolute bottom-0 left-0 right-0 h-16 bg-gradient-to-t from-white dark:from-gray-900 to-transparent"
 	></div>
+</section>
+<section class="container mx-auto px-4 py-16">
+	<h2 class="text-4xl font-bold text-gray-900 dark:text-white mb-8 text-center">State Officials</h2>
+	<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+		{#if stateData.governor}
+			<OfficialCard official={stateData.governor} />
+		{/if}
+		{#each stateData.officials.filter((o) => o.title !== stateData.governor?.title) as official}
+			<OfficialCard {official} />
+		{/each}
+	</div>
 </section>
