@@ -11,20 +11,14 @@
 	let errorMessage = '';
 	let isLoading = false;
 
-	function sanitizeInput(input: string): string {
-		return input.replace(/[^a-zA-Z0-9\s.,'-]/g, '').trim();
-	}
-
 	const fetchSuggestions = debounce(async (input: string) => {
-		if (input.length < 3) {
+		if (input.length < 2) {
 			suggestions = [];
 			return;
 		}
 
-		const sanitizedInput = sanitizeInput(input);
-
 		try {
-			const response = await fetch(`/api/geocode?input=${encodeURIComponent(sanitizedInput)}`);
+			const response = await fetch(`/api/geocode?input=${encodeURIComponent(input)}`);
 			if (!response.ok) throw new Error('Failed to fetch suggestions');
 			const data = await response.json();
 			suggestions = data.suggestions;
@@ -41,21 +35,12 @@
 	const selectSuggestion = (suggestion: { place_name: string; id: string; type: string }) => {
 		address = suggestion.place_name;
 		suggestions = [];
-		if (suggestion.type === 'region') {
-			goto(
-				`/${suggestion.place_name.toLowerCase().replace(/\s+/g, '-')}?lat=${
-					suggestion.center[1]
-				}&lon=${suggestion.center[0]}`
-			);
-		} else {
-			handleAddressSubmit();
-		}
+		handleAddressSubmit();
 	};
 
-	const handleAddressSubmit = async (selectedAddress?: string) => {
-		const sanitizedAddress = sanitizeInput(selectedAddress || address);
-		if (!sanitizedAddress) {
-			errorMessage = 'Please enter a valid address.';
+	const handleAddressSubmit = async () => {
+		if (!address) {
+			errorMessage = 'Please enter a valid address or state.';
 			return;
 		}
 
@@ -67,14 +52,27 @@
 				headers: {
 					'Content-Type': 'application/json'
 				},
-				body: JSON.stringify({ address: sanitizedAddress })
+				body: JSON.stringify({ address: address })
 			});
 
 			if (!response.ok) throw new Error('Failed to process address');
 
 			const data = await response.json();
-			if (data.state) {
-				goto(`/${data.state.toLowerCase().replace(/\s+/g, '-')}?lat=${data.lat}&lon=${data.lng}`);
+			let state: string;
+			let url: string;
+
+			if (data.type === 'region') {
+				// For state-level responses
+				state = data.address.split(',')[0].trim();
+				url = `/${state.toLowerCase().replace(/\s+/g, '-')}`;
+			} else {
+				// For more detailed addresses
+				state = data.state;
+				url = `/${state.toLowerCase().replace(/\s+/g, '-')}?lat=${data.lat}&lon=${data.lng}`;
+			}
+
+			if (state) {
+				goto(url);
 			} else {
 				errorMessage = 'Unable to determine state from the given address.';
 			}
@@ -107,7 +105,6 @@
 					</div>
 					<Input
 						bind:value={address}
-						on:input={() => fetchSuggestions(address)}
 						class="w-full pl-12 pr-4 py-4 text-lg text-gray-900 dark:text-white bg-gray-100 dark:bg-gray-700 border-2 border-transparent focus:border-sky-500 focus:ring-2 focus:ring-sky-200 dark:focus:ring-sky-800 rounded-lg transition-all duration-200 ease-in-out"
 						placeholder="Enter your address or state"
 						type="text"
@@ -140,7 +137,7 @@
 					{/if}
 				</Button>
 				<p class="text-sm text-gray-600 dark:text-gray-400 mt-6 text-center">
-					Click the map pin icon to use your current location, or enter your address manually.
+					Enter your address, state name, or state abbreviation.
 				</p>
 			</form>
 			{#if errorMessage}

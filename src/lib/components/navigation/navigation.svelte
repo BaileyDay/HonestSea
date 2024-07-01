@@ -51,14 +51,14 @@
 				</nav>
 			</div>
 			<div class="flex items-center">
-				{#if !user}
+				<!-- {#if !user}
 					<Button
 						on:click={() => goto('/auth/sign-in')}
 						class="bg-sky-500 hover:bg-sky-600 text-white mr-4"
 					>
 						Sign in
 					</Button>
-				{/if}
+				{/if} -->
 				<DropdownMenu.Root>
 					<DropdownMenu.Trigger asChild let:builder>
 						<Button
