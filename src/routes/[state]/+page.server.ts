@@ -1,101 +1,102 @@
-import type { PageServerLoad } from './$types';
-import db from '$lib/server/database/drizzle';
-import { geodata } from '$lib/server/database/drizzle-schemas';
-import { eq, sql } from 'drizzle-orm';
 import { error } from '@sveltejs/kit';
+import { abr } from '$lib/state-abbreviations';
+import { getCongressionalDistricts, getStateBoundary } from '$lib/server/tiger-api';
+import type { PageServerLoad } from './$types';
 
-const abr = {
-	alabama: 'AL',
-	alaska: 'AK',
-	arizona: 'AZ',
-	arkansas: 'AR',
-	california: 'CA',
-	colorado: 'CO',
-	connecticut: 'CT',
-	delaware: 'DE',
-	florida: 'FL',
-	georgia: 'GA',
-	hawaii: 'HI',
-	idaho: 'ID',
-	illinois: 'IL',
-	indiana: 'IN',
-	iowa: 'IA',
-	kansas: 'KS',
-	kentucky: 'KY',
-	louisiana: 'LA',
-	maine: 'ME',
-	maryland: 'MD',
-	massachusetts: 'MA',
-	michigan: 'MI',
-	minnesota: 'MN',
-	mississippi: 'MS',
-	missouri: 'MO',
-	montana: 'MT',
-	nebraska: 'NE',
-	nevada: 'NV',
-	'new hampshire': 'NH',
-	'new jersey': 'NJ',
-	'new mexico': 'NM',
-	'new york': 'NY',
-	'north carolina': 'NC',
-	'north dakota': 'ND',
-	ohio: 'OH',
-	oklahoma: 'OK',
-	oregon: 'OR',
-	pennsylvania: 'PA',
-	'rhode island': 'RI',
-	'south carolina': 'SC',
-	'south dakota': 'SD',
-	tennessee: 'TN',
-	texas: 'TX',
-	utah: 'UT',
-	vermont: 'VT',
-	virginia: 'VA',
-	washington: 'WA',
-	'west virginia': 'WV',
-	wisconsin: 'WI',
-	wyoming: 'WY'
-};
+import { CONGRESS_API_KEY } from '$env/static/private';
 
 export const load: PageServerLoad = async ({ params, fetch }) => {
-	const stateName = params.state.toString();
+	const stateName = params.state.toString().toLowerCase();
 	const stateAbr = abr[stateName];
 
+	if (!stateAbr) {
+		throw error(404, 'State not found');
+	}
+
 	try {
-		// Fetch existing state data
-		const stateData = await db
-			.select()
-			.from(geodata)
-			.where(sql`state = ${stateAbr} and ${geodata.level} = 'state'`);
+		// Fetch congressional districts
+		const districts = await getCongressionalDistricts(stateAbr);
 
-		const districtData = await db
-			.select()
-			.from(geodata)
-			.where(sql`state = ${stateAbr} and ${geodata.level} = 'district'`);
+		// Get state boundary
+		const stateBoundary = getStateBoundary(districts);
 
-		// Fetch officials data from our new API endpoint
-		const officialsResponse = await fetch(`/api/officials/${stateName}`);
-		if (!officialsResponse.ok) {
-			throw new Error('Failed to fetch officials data');
+		if (!districts.length) {
+			throw error(404, `No congressional districts found for ${stateName}`);
 		}
-		const officials = await officialsResponse.json();
 
-		// Find the governor from the officials
-		const governor = officials.find((official: any) =>
-			official.title.toLowerCase().includes('governor')
+		// Fetch Congress members from Congress.gov API
+		const congressUrl = `https://api.congress.gov/v3/member/${stateAbr}?format=json&api_key=${CONGRESS_API_KEY}&currentMember=true`;
+		const congressResponse = await fetch(congressUrl);
+		const congressData = await congressResponse.json();
+
+		// Fetch state officials from your database
+		const stateOfficialsResponse = await fetch(`/api/officials/${stateName}`);
+		const stateOfficials = await stateOfficialsResponse.json();
+
+		// Extract and format Congress members
+		const congressMembers = congressData.members.map((member: any) => ({
+			name: member.name,
+			party: member.partyName,
+			state: member.state,
+			district: member.district?.toString() || 'AL',
+			title: member.terms?.item[0]?.chamber || 'Representative',
+			role: 'representative',
+			photo: member.depiction?.imageUrl
+		}));
+
+		// Separate senators and representatives
+		const senators = congressMembers.filter((member) => member.title === 'Senate');
+
+		const representatives = congressMembers.filter(
+			(member) => member.title === 'House of Representatives'
 		);
+
+		// Get state governor and other officials
+		const governor = stateOfficials.find(
+			(official: any) => official.title?.toLowerCase().includes('governor')
+		);
+
+		const stateLeadership = stateOfficials.filter(
+			(official: any) =>
+				official.level === 'administrativeArea1' &&
+				!official.title?.toLowerCase().includes('supreme court')
+		);
+
+		const justices = stateOfficials.filter(
+			(official: any) => official.title?.toLowerCase().includes('supreme court')
+		);
+
+		// Match representatives with districts
+		const districtsWithReps = districts.map((district) => {
+			const districtNum = district.district_number.replace(/^0+/, '');
+			const representative = representatives.find(
+				(rep) => rep.district.replace(/^0+/, '') === districtNum
+			);
+
+			return {
+				...district,
+				representative
+			};
+		});
 
 		return {
 			stateData: {
 				name: stateName,
-				stateJson: stateData[0],
-				districts: districtData,
-				officials: officials,
-				governor: governor || null
+				stateJson: {
+					data: stateBoundary
+				},
+				districts: districtsWithReps,
+				senators,
+				governor,
+				stateLeadership,
+				justices
 			}
 		};
 	} catch (err) {
 		console.error('Error loading state data:', err);
-		throw error(500, 'Failed to load state data');
+		throw error(500, {
+			message: 'Failed to load state data',
+			cause: err instanceof Error ? err.message : 'Unknown error'
+		});
 	}
 };

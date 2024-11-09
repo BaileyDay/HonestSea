@@ -1,4 +1,13 @@
-import { pgTable, text, jsonb, timestamp, integer, boolean, uuid } from 'drizzle-orm/pg-core';
+import {
+	pgTable,
+	text,
+	jsonb,
+	timestamp,
+	integer,
+	boolean,
+	uuid,
+	unique
+} from 'drizzle-orm/pg-core';
 
 export const userTable = pgTable('users', {
 	id: text('id').notNull().primaryKey(),
@@ -53,13 +62,20 @@ export const officialsTable = pgTable('officials', {
 	is_active: boolean('is_active').notNull()
 });
 
-export const geodata = pgTable('geodata', {
-	id: uuid('id').defaultRandom().primaryKey(),
-	state: text('state').notNull(),
-	level: text('level').notNull(), // Add this line to match your database
-	district_number: text('district_number'),
-	data: jsonb('data').notNull()
-});
+export const geodata = pgTable(
+	'geodata',
+	{
+		id: uuid('id').defaultRandom().primaryKey(),
+		state: text('state').notNull(),
+		level: text('level').notNull(),
+		district_number: text('district_number'),
+		data: jsonb('data').notNull(),
+		year: integer('year').notNull()
+	},
+	(table) => ({
+		uniqueConstraint: unique().on(table.state, table.level, table.district_number, table.year)
+	})
+);
 
 export type User = typeof userTable.$inferInsert;
 export type UpdateUser = Partial<typeof userTable.$inferInsert>;
